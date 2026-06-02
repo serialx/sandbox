@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec /opt/gem/agent-browser-wrapper.sh "$@"

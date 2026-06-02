@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser UI - CDP Remote</title>
+    <script>
+        (function() {
+            const currentPath = window.location.pathname;
+            const basePath = currentPath.replace(/\/browser-ui[^\/]*$/, '');
+            const baseUrl = window.location.origin + basePath;
+            const base = document.createElement('base');
+            base.href = baseUrl + '/';
+            document.head.appendChild(base);
+        })();
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%;
+            background: #1e1e1e; overflow: auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: #e0e0e0;
+        }
+
+        #browserContainer { transform-origin: top left; }
+
+        .status-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: #1e1e1e; z-index: 1000;
+        }
+        .status-overlay.hidden { display: none; }
+
+        .spinner {
+            width: 32px; height: 32px;
+            border: 3px solid #3c3c3c; border-top: 3px solid #0e639c;
+            border-radius: 50%; animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .status-text { color: #999; font-size: 14px; text-align: center; max-width: 500px; line-height: 1.5; }
+        .error-text { color: #f44747; }
+        .retry-btn {
+            margin-top: 16px; padding: 8px 20px;
+            background: #0e639c; border: none; border-radius: 4px;
+            color: white; cursor: pointer; font-size: 13px;
+        }
+        .retry-btn:hover { background: #1177bb; }
+    </style>
+</head>
+<body>
+    <div id="browserContainer"></div>
+    <div class="status-overlay" id="statusOverlay">
+        <div class="spinner" id="statusSpinner"></div>
+        <div class="status-text" id="statusText">Connecting to browser...</div>
+    </div>
+
+    <script src="static/sandbox/agent-infra-browser-ui@0.2.2/index.js"></script>
+    <script>
+        class BrowserUIManager {
+            constructor() {
+                this.baseLocation = new URL('.', window.location.href);
+                this.params = new URLSearchParams(window.location.search);
+                this.browserUI = null;
+                this.viewportWidth = 0;
+                this.viewportHeight = 0;
+
+                // Reconnection
+                this.reconnecting = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.reconnectDelay = 2000;
+
+                // Health check
+                this.healthCheckInterval = null;
+                this.lastCdpUrl = null;
+
+                this.init();
+            }
+
+            async init() {
+                try {
+                    await this.connectAndRender();
+                    this.startHealthCheck();
+                    this.setupVisibilityHandler();
+                } catch (err) {
+                    this.showError(err.message);
+                    this.scheduleReconnect();
+                }
+            }
+
+            // ----------------------------------------------------------
+            // Core: single source of truth from /v1/browser/info
+            // ----------------------------------------------------------
+
+            async fetchBrowserInfo() {
+                const infoUrl = new URL('v1/browser/info', this.baseLocation.href);
+                this.params.forEach((value, key) => {
+                    infoUrl.searchParams.set(key, value);
+                });
+
+                const resp = await fetch(infoUrl.toString());
+                if (!resp.ok) {
+                    throw new Error(`/v1/browser/info returned HTTP ${resp.status}`);
+                }
+                const json = await resp.json();
+                return json.data;
+            }
+
+            /**
+             * Normalize WebSocket URL protocol based on current page protocol.
+             * Use wss:// for HTTPS pages, ws:// for HTTP pages.
+             */
+            normalizeWsProtocol(wsUrl) {
+                if (!wsUrl) return wsUrl;
+                const isSecure = window.location.protocol === 'https:';
+                if (isSecure && wsUrl.startsWith('ws://')) {
+                    return wsUrl.replace(/^ws:\/\//, 'wss://');
+                } else if (!isSecure && wsUrl.startsWith('wss://')) {
+                    return wsUrl.replace(/^wss:\/\//, 'ws://');
+                }
+                return wsUrl;
+            }
+
+            async connectAndRender() {
+                this.showStatus('Fetching browser info...');
+                const info = await this.fetchBrowserInfo();
+
+                const rawCdpUrl = this.params.get('ws') || info.cdp_url;
+                // Use wss:// for HTTPS pages, ws:// for HTTP pages
+                const cdpUrl = this.normalizeWsProtocol(rawCdpUrl);
+                this.lastCdpUrl = info.cdp_url;
+
+                // page_viewport = real Chrome page viewport (from server-side CDP query)
+                // viewport      = display size (xrandr / env var) — fallback
+                const pv = info.page_viewport || info.viewport;
+                const viewport = { width: pv.width, height: pv.height };
+
+                console.log('Browser info:', { cdpUrl, viewport, page_viewport: info.page_viewport, display: info.viewport });
+
+                this.showStatus('Initializing browser view...');
+                await this.createBrowserUI(cdpUrl, viewport);
+
+                this.reconnectAttempts = 0;
+                this.reconnectDelay = 2000;
+            }
+
+            // ----------------------------------------------------------
+            // BrowserUI lifecycle
+            // ----------------------------------------------------------
+
+            async createBrowserUI(wsEndpoint, viewport) {
+                await this.destroyBrowserUI();
+
+                const container = document.getElementById('browserContainer');
+                const BrowserUI = window.agent_infra_browser_ui.BrowserUI;
+
+                this.browserUI = await BrowserUI.create({
+                    root: container,
+                    browserOptions: {
+                        connect: {
+                            browserWSEndpoint: wsEndpoint,
+                            defaultViewport: {
+                                width: viewport.width,
+                                height: viewport.height,
+                            },
+                        },
+                    },
+                });
+
+                this.viewportWidth = viewport.width;
+                this.viewportHeight = viewport.height;
+
+                this.applyScale();
+                window.addEventListener('resize', this._onResize);
+                this.hideStatus();
+            }
+
+            async destroyBrowserUI() {
+                window.removeEventListener('resize', this._onResize);
+                if (this.browserUI) {
+                    try { await this.browserUI.destroy(); } catch (e) { /* ignore */ }
+                    this.browserUI = null;
+                }
+            }
+
+            _onResize = () => this.applyScale();
+
+            applyScale() {
+                const container = document.getElementById('browserContainer');
+                if (!container || !this.viewportWidth) return;
+
+                const chromeHeight = 70; // browser-ui's own tab bar + controls bar
+                const totalHeight = this.viewportHeight + chromeHeight;
+
+                // Fill width, center vertically
+                const scale = window.innerWidth / this.viewportWidth;
+                const scaledHeight = totalHeight * scale;
+                const offsetY = Math.max(0, (window.innerHeight - scaledHeight) / 2);
+
+                console.log('applyScale:', {
+                    windowInnerWidth: window.innerWidth,
+                    windowInnerHeight: window.innerHeight,
+                    viewportWidth: this.viewportWidth,
+                    viewportHeight: this.viewportHeight,
+                    chromeHeight,
+                    totalHeight,
+                    scale,
+                    scaledHeight,
+                    offsetY,
+                    transform: `translate(0px, ${offsetY}px) scale(${scale})`
+                });
+
+                container.style.transform = `translate(0px, ${offsetY}px) scale(${scale})`;
+                container.style.width = `${this.viewportWidth}px`;
+            }
+
+            // ----------------------------------------------------------
+            // Health check — no direct CDP access, uses REST API only
+            // ----------------------------------------------------------
+
+            startHealthCheck() {
+                this.stopHealthCheck();
+                this.healthCheckInterval = setInterval(() => this.checkHealth(), 5000);
+            }
+
+            stopHealthCheck() {
+                if (this.healthCheckInterval) {
+                    clearInterval(this.healthCheckInterval);
+                    this.healthCheckInterval = null;
+                }
+            }
+
+            async checkHealth() {
+                if (this.reconnecting) return;
+
+                try {
+                    // 1. BrowserUI instance self-destructed
+                    if (this.browserUI && !this.browserUI.isInitialized) {
+                        console.log('BrowserUI no longer initialized, reconnecting...');
+                        this.triggerReconnect();
+                        return;
+                    }
+
+                    // 2. Ask /v1/browser/info — if cdp_url changed, Chrome restarted
+                    const info = await this.fetchBrowserInfo();
+                    if (this.lastCdpUrl && info.cdp_url && info.cdp_url !== this.lastCdpUrl) {
+                        console.log('CDP URL changed (browser restarted). Reconnecting...');
+                        this.triggerReconnect();
+                    }
+                } catch (e) {
+                    console.warn('Health check failed:', e);
+                    this.triggerReconnect();
+                }
+            }
+
+            // ----------------------------------------------------------
+            // Reconnection with exponential backoff
+            // ----------------------------------------------------------
+
+            triggerReconnect() {
+                if (this.reconnecting) return;
+                this.reconnecting = true;
+                this.stopHealthCheck();
+                this.scheduleReconnect();
+            }
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    this.showError(
+                        'Lost connection to browser. Max reconnection attempts reached.' +
+                        '<br>Please refresh the page.'
+                    );
+                    return;
+                }
+
+                this.reconnectAttempts++;
+                const attempt = this.reconnectAttempts;
+
+                this.showStatus(`Reconnecting (${attempt}/${this.maxReconnectAttempts})...`);
+
+                setTimeout(async () => {
+                    try {
+                        await this.connectAndRender();
+                        this.reconnecting = false;
+                        this.startHealthCheck();
+                        console.log(`Reconnected on attempt ${attempt}`);
+                    } catch (err) {
+                        console.warn(`Reconnect attempt ${attempt} failed:`, err.message);
+                        this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 30000);
+                        this.scheduleReconnect();
+                    }
+                }, this.reconnectDelay);
+            }
+
+            // ----------------------------------------------------------
+            // Visibility: re-check when iframe becomes visible
+            // ----------------------------------------------------------
+
+            setupVisibilityHandler() {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        this.checkHealth();
+                    }
+                });
+            }
+
+            // ----------------------------------------------------------
+            // UI
+            // ----------------------------------------------------------
+
+            showStatus(text) {
+                const overlay = document.getElementById('statusOverlay');
+                const statusText = document.getElementById('statusText');
+                const spinner = document.getElementById('statusSpinner');
+                overlay.classList.remove('hidden');
+                spinner.style.display = 'block';
+                statusText.className = 'status-text';
+                statusText.innerHTML = text;
+            }
+
+            showError(message) {
+                const overlay = document.getElementById('statusOverlay');
+                const statusText = document.getElementById('statusText');
+                const spinner = document.getElementById('statusSpinner');
+                overlay.classList.remove('hidden');
+                spinner.style.display = 'none';
+                statusText.className = 'status-text error-text';
+                statusText.innerHTML = message +
+                    '<br><button class="retry-btn" onclick="location.reload()">Retry</button>';
+            }
+
+            hideStatus() {
+                document.getElementById('statusOverlay').classList.add('hidden');
+            }
+        }
+
+        new BrowserUIManager();
+    </script>
+</body>
+</html>

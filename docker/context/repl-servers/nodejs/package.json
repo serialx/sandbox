@@ -1,0 +1,16 @@
+{
+  "name": "nodejs-repl-server",
+  "version": "1.0.0",
+  "description": "Node.js REPL Server for stateful JavaScript execution",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@swc/core": "^1.15.10",
+    "fastify": "^5.0.0"
+  }
+}

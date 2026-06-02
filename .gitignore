@@ -2,6 +2,8 @@
 .DS_Store
 *.local
 *.log*
+# ...but not supervisord unit files whose names merely contain ".log"
+!**/supervisord.log_tail.conf
 
 # Dist
 node_modules

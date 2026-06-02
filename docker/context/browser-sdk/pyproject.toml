@@ -1,0 +1,34 @@
+# Reconstructed from site-packages/browser_sdk-0.1.0.dist-info metadata
+# recovered from the running image. `browser_sdk/` was copied verbatim from
+# site-packages. This is an in-house dependency of `python-server`.
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "browser-sdk"
+version = "0.1.0"
+description = "Browser SDK"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.25.0",
+    "playwright>=1.40.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+local = [
+    "pyautogui>=0.9.54",
+    "pyperclip>=1.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["browser_sdk*"]
+
+[tool.setuptools.package-data]
+browser_sdk = ["py.typed"]
+"browser_sdk.captcha" = ["js/*.js"]
+"browser_sdk.helpers" = ["js/*.js", "js/vendor/*.js"]
+"browser_sdk.stealth" = ["js/*.js"]

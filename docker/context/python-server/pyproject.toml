@@ -1,0 +1,63 @@
+# Reconstructed from the installed metadata of `python-server` 0.1.0
+# (site-packages/python_server-0.1.0.dist-info/METADATA + RECORD) recovered
+# from the running image. The `app` and `vendors` source trees were copied
+# verbatim out of site-packages. Building this produces the same
+# python_server-0.1.0-py3-none-any.whl that the original image installed.
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-server"
+version = "0.1.0"
+description = "Python Server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click==8.2.1",
+    "fastapi==0.116.0",
+    "httpx[socks]==0.28.1",
+    "pydantic==2.11.7",
+    "uvicorn[standard]==0.40.0",
+    "email-validator==2.2.0",
+    "python-multipart==0.0.20",
+    "pydantic-settings==2.10.1",
+    "jupyter-client>=8.6.3",
+    "ipykernel>=6.30.1",
+    "openhands-aci>=0.3.1",
+    "mcp[cli]>=1.23.1",
+    "pexpect>=4.8.0",
+    "ptyprocess>=0.7.0",
+    "terminado>=0.18.1",
+    "tornado>=6.5.1",
+    "blessed>=1.21.0",
+    "bashlex>=0.18",
+    "libtmux>=0.39.0",
+    "termcolor>=3.1.0",
+    "pyautogui>=0.9.54",
+    "pyperclip>=1.9.0",
+    "python-json-logger>=3.3.0",
+    "markitdown[all]>=0.1.3",
+    "distro>=1.9.0",
+    "pyyaml>=6.0.0",
+    "fastmcp<3.0.0,>=2.13.2",
+    "cachelib>=0.12.0",
+    "pyjwt>=2.10.0",
+    "python-docx>=1.0.0",
+    "browser-sdk",
+    "watchfiles>=1.0.0",
+    "aiosqlite>=0.20.0",
+    "asyncinotify>=4.4.0",
+    "watchdog>=6.0.0",
+]
+
+[project.scripts]
+python-server = "app.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "vendors*"]
+
+[tool.setuptools.package-data]
+app = ["py.typed"]
+"app.scripts" = ["*.sh"]

@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Determine the appropriate binary based on the platform
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BINARY_NAME=""
+
+# Detect platform and choose appropriate binary
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    if [[ "$(uname -m)" == "arm64" ]]; then
+        BINARY_NAME="darwin_arm64_ve"
+    else
+        BINARY_NAME="darwin_amd64_ve"
+    fi
+elif [[ "$OSTYPE" == "linux"* ]]; then
+    # Linux
+    if [[ "$(uname -m)" == "x86_64" ]]; then
+        BINARY_NAME="linux_amd64_ve"
+    elif [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
+        BINARY_NAME="linux_arm64_ve"
+    fi
+else
+    # Default to darwin_arm64_ve for this project as that's what's available
+    BINARY_NAME="darwin_arm64_ve"
+fi
+
+BINARY_PATH="$SCRIPT_DIR/$BINARY_NAME"
+
+# If no arguments are provided, run the binary to show its usage (without requiring credential file)
+if [ $# -eq 0 ]; then
+    if [ -f "$BINARY_PATH" ]; then
+        # Set default region if not already set
+        if [ -z "$VOLCENGINE_REGION" ]; then
+            export VOLCENGINE_REGION="cn-beijing"
+        fi
+        exec "$BINARY_PATH"
+    else
+        echo "Volcengine binary not found: $BINARY_PATH" >&2
+        exit 1
+    fi
+fi
+
+# For any other arguments, first check and set environment variables if needed
+if [ -z "$VOLCENGINE_ACCESS_KEY" ] || [ -z "$VOLCENGINE_SECRET_KEY" ]; then
+    # Check if the credential path environment variable is set
+    CREDENTIAL_PATH="${FAAS_IAM_ROLE_CREDENTIAL_PATH:-/var/run/secrets/iam/credential}"
+    
+    # Check if the credential file exists
+    if [ ! -f "$CREDENTIAL_PATH" ]; then
+        echo "Credential file not found at $CREDENTIAL_PATH" >&2
+        exit 1
+    fi
+    
+    # Read the credential file
+    CREDENTIAL_CONTENT=$(cat "$CREDENTIAL_PATH")
+    
+    # Extract values using sed
+    ACCESS_KEY_ID=$(echo "$CREDENTIAL_CONTENT" | sed -n 's/.*"access_key_id":"\([^"]*\)".*/\1/p')
+    SECRET_ACCESS_KEY=$(echo "$CREDENTIAL_CONTENT" | sed -n 's/.*"secret_access_key":"\([^"]*\)".*/\1/p')
+    SESSION_TOKEN=$(echo "$CREDENTIAL_CONTENT" | sed -n 's/.*"session_token":"\([^"]*\)".*/\1/p')
+    
+    # Set the environment variables
+    export VOLCENGINE_ACCESS_KEY="$ACCESS_KEY_ID"
+    export VOLCENGINE_SECRET_KEY="$SECRET_ACCESS_KEY"
+    
+    # Only set session token if it exists in the credential file
+    if [ -n "$SESSION_TOKEN" ]; then
+        export VOLCENGINE_SESSION_TOKEN="$SESSION_TOKEN"
+    fi
+else
+    # Environment variables are already set
+    true
+fi
+
+# Set default region if not already set (always do this regardless of whether other variables were set)
+if [ -z "$VOLCENGINE_REGION" ]; then
+    export VOLCENGINE_REGION="cn-beijing"
+fi
+
+# Check if the first argument is a special command that should be handled by the volcengine binary
+FIRST_ARG="$1"
+if [[ "$FIRST_ARG" == "vefaas" || "$FIRST_ARG" == "vear" || "$FIRST_ARG" == "iam" || "$FIRST_ARG" == "vpc" || "$FIRST_ARG" == "ecs" ]]; then
+    # If the binary exists, execute it with the arguments
+    if [ -f "$BINARY_PATH" ]; then
+        exec "$BINARY_PATH" "$@"
+    else
+        echo "Volcengine binary not found: $BINARY_PATH" >&2
+        exit 1
+    fi
+else
+    # Execute the command as before
+    exec "$@"
+fi

@@ -1,0 +1,13 @@
+# Reference-only files (not needed inside the build)
+apt-packages.full.txt
+README.md
+
+# Junk that should never enter the build context
+**/.git
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/build
+**/dist
+**/*.egg-info

@@ -1,0 +1,25 @@
+{
+  "name": "aio-sandbox-cli",
+  "version": "0.3.12",
+  "description": "CLI for AIO Sandbox — browser, GUI, shell, file, skills, and MCP operations",
+  "type": "module",
+  "bin": {
+    "aio": "dist/aio.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "cosmiconfig": "^9.0.0",
+    "typescript": "^5.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
