@@ -388,6 +388,12 @@ RUN set -eux; \
     chmod +x /opt/application/run.sh; \
     # supervisord config location expected by run.sh \
     ln -sf /opt/gem/supervisord.conf /etc/supervisord.conf; \
+    # wire the recovered font-name aliases into fontconfig so named CJK/Office \
+    # fonts (SimHei, Microsoft YaHei, PingFang, MS Gothic, ...) map to the \
+    # installed Noto CJK faces for chrome / pango / weasyprint / manim. Ubuntu \
+    # only ships the Latin metric-aliases (Arial -> Liberation) by default. \
+    mkdir -p /etc/fonts/conf.d; \
+    ln -sf /opt/gem/99-font-aliases.conf /etc/fonts/conf.d/99-font-aliases.conf; \
     # node/fnm env for shells; run.sh sources this file under `set -e` \
     mkdir -p /etc/profile.d; \
     ln -sf /opt/gem/nodejs.sh /etc/profile.d/nodejs.sh; \
