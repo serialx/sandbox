@@ -30,11 +30,11 @@ a full VNC desktop with Chrome, an MCP hub, and several MCP servers.
 | sandbox `python-server` — shell/file/jupyter APIs **and the MCP hub** (`/mcp`) | 8091 | **recovered** `python-server` wheel (server venv, py3.13) |
 | JupyterLab | 8888 | pip (server venv, py3.13) |
 | Node.js REPL (code execution) | 8092 | recovered `repl-servers/nodejs` (node 22) |
-| code-server (VS Code) | 8200 | code-server 4.104.0 release |
+| code-server (VS Code) | 8200 | code-server 4.123.0 release |
 | MCP server: browser | 8100 | npm `@agent-infra/mcp-server-browser` |
 | MCP servers: markitdown, chrome-devtools | on-demand | `markitdown` (pip) / `chrome-devtools-mcp` (npm) — spawned by the hub on demand, **not** fixed-port services |
 | TigerVNC `Xvnc` | 5900 | apt `tigervnc-standalone-server` |
-| VNC websocket bridge (`websocat`) | 6080 | websocat 1.13.0 + noVNC 1.4.0 |
+| VNC websocket bridge (`websocat`) | 6080 | websocat 1.14.1 + noVNC 1.7.0 |
 | Chrome remote debugging (CDP) | 9222 | google-chrome-stable (amd64) / Playwright Chromium (arm64) |
 
 Everything is orchestrated by **supervisord** (PID 1 is
@@ -46,20 +46,20 @@ Everything is orchestrated by **supervisord** (PID 1 is
 
 Components fall into three buckets:
 
-1. **Public upstreams** — installed from their normal sources, pinned to the
-   versions observed in the live image:
+1. **Public upstreams** — installed from their normal sources, pinned to current
+   upstream releases (modernized fork; bumped past the versions in the live image):
    * `ubuntu:26.04` base, ~160 apt packages (fonts, X/VNC, fcitx5 IME, media
      libs, chrome runtime libs, build toolchain, `supervisor`).
    * A single **Python 3.13** via `uv` (python-build-standalone), shared by the
      base/user env and the isolated server venv. (26.04's apt python is 3.14;
      we leave it incidental — only there to satisfy apt deps.)
-   * Node **20.20.2 / 22.22.2 / 24.15.0** via `fnm`; npm globals `bun@1.3.3`,
-     `@agent-infra/mcp-server-browser@1.2.29`, `agent-browser@0.22.3`,
-     `chrome-devtools-mcp@0.9.0`, `yarn`.
-   * `uv 0.8.9`, `code-server 4.104.0`, `noVNC 1.4.0`, `websocat 1.13.0`,
-     `gost 3.0.0-rc10` (same versions on both arches — per-arch release assets).
-     Browser: `google-chrome-stable 139.0.7258.127` on amd64; Playwright
-     Chromium (build 1194) on arm64.
+   * Node **20.20.2 / 22.22.3 / 24.16.0** via `fnm`; npm globals `bun@1.3.14`,
+     `@agent-infra/mcp-server-browser@1.2.29`, `agent-browser@0.27.1`,
+     `chrome-devtools-mcp@1.1.1`, `yarn`.
+   * `uv 0.11.19`, `code-server 4.123.0`, `noVNC 1.7.0`, `websocat 1.14.1`,
+     `gost 3.2.6` (same versions on both arches — per-arch release assets).
+     Browser: `google-chrome-stable 149.0.7827.53` on amd64; Playwright
+     Chromium (build 1226) on arm64.
    * `requirements/base-3.13.txt` — the user/base env's top-level libraries
      (numpy/pandas/matplotlib/weasyprint/ipykernel/**yt-dlp**, …) resolved
      against Python 3.13. The server venv's deps come from the in-house wheels'

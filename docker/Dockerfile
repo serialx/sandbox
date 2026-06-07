@@ -24,31 +24,33 @@
 # See ./README.md for the full reconstruction notes and known caveats.
 # -----------------------------------------------------------------------------
 
-# ----- pinned versions (observed in the live image) --------------------------
+# ----- pinned versions -------------------------------------------------------
+# Modernized fork: bumped to latest upstream as of 2026-06 (audited & verified
+# fetchable). NODE20 / PY313 / MCP_SERVER_BROWSER are already current upstream.
 ARG PY313_VERSION=3.13
 ARG NODE20_VERSION=20.20.2
-ARG NODE22_VERSION=22.22.2
-ARG NODE24_VERSION=24.15.0
-ARG FNM_VERSION=1.38.1
-ARG UV_VERSION=0.8.9
-ARG BUN_VERSION=1.3.3
+ARG NODE22_VERSION=22.22.3
+ARG NODE24_VERSION=24.16.0
+ARG FNM_VERSION=1.39.0
+ARG UV_VERSION=0.11.19
+ARG BUN_VERSION=1.3.14
 ARG MCP_SERVER_BROWSER_VERSION=1.2.29
-ARG AGENT_BROWSER_VERSION=0.22.3
-ARG CHROME_DEVTOOLS_MCP_VERSION=0.9.0
-ARG CODE_SERVER_VERSION=4.104.0
-ARG NOVNC_VERSION=1.4.0
-ARG WEBSOCAT_VERSION=1.13.0
-ARG GOST_VERSION=3.0.0-rc10
-ARG CHROME_DEB_VERSION=139.0.7258.127-1
+ARG AGENT_BROWSER_VERSION=0.27.1
+ARG CHROME_DEVTOOLS_MCP_VERSION=1.1.1
+ARG CODE_SERVER_VERSION=4.123.0
+ARG NOVNC_VERSION=1.7.0
+ARG WEBSOCAT_VERSION=1.14.1
+ARG GOST_VERSION=3.2.6
+ARG CHROME_DEB_VERSION=149.0.7827.53-1
 # arm64 Linux has no Google Chrome build, so on arm64 the browser is Playwright's
 # Chromium (the same fallback the recovered /opt/gem/browser-ctl.sh uses). This
-# is its build number.
-ARG PLAYWRIGHT_CHROMIUM_BUILD=1194
-ARG VE_VERSION=1.0.43
+# is its build number (paired with the Chrome stable above).
+ARG PLAYWRIGHT_CHROMIUM_BUILD=1226
+ARG VE_VERSION=1.0.45
 
 # uv binary (used to provision the python-build-standalone interpreters and to
 # build the recovered in-house wheels). Pulled from the official image.
-FROM ghcr.io/astral-sh/uv:0.8.9 AS uvbin
+FROM ghcr.io/astral-sh/uv:0.11.19 AS uvbin
 
 # -----------------------------------------------------------------------------
 # `aio` CLI — built from source re-authored out of the original esbuild bundle.
@@ -100,8 +102,8 @@ RUN set -eux; \
 # it CGO-free as a static `ve`; we reproduce that. (Off the sandbox boot path —
 # a Volcengine cloud CLI used only with IAM credentials.)
 # -----------------------------------------------------------------------------
-FROM golang:1.23-bookworm AS ve-build
-ARG VE_VERSION=1.0.43
+FROM golang:1.26-bookworm AS ve-build
+ARG VE_VERSION=1.0.45
 ARG TARGETARCH
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH}
 RUN go install -trimpath -ldflags "-s -w -X main.version=${VE_VERSION}" \
