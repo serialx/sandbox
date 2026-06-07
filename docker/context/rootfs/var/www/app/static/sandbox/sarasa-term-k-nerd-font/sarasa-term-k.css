@@ -1,0 +1,41 @@
+/*
+ * Sarasa Term K (Nerd Font) — terminal web font for AIO Sandbox.
+ *
+ * Used by the xterm.js dashboard terminal (/opt/terminal/index.html) and the
+ * code-server integrated terminal (injected into the VS Code workbench by the
+ * code_server.conf sub_filter). Fixed-width: half-width Latin / full-width CJK,
+ * plus Nerd-Font glyphs. woff2 from
+ * github.com/jonz94/woff2-sarasa-gothic-nerd-fonts.
+ *
+ * URLs are relative to this file, so they resolve the same whether the CSS is
+ * loaded from /terminal (with a <base> tag) or from /code-server/ — the woff2
+ * sit next to it under /static/sandbox/sarasa-term-k-nerd-font/.
+ */
+@font-face {
+  font-family: 'Sarasa Term K';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('sarasa-term-k-regular-nerd-font.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarasa Term K';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('sarasa-term-k-bold-nerd-font.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarasa Term K';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('sarasa-term-k-italic-nerd-font.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarasa Term K';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('sarasa-term-k-bolditalic-nerd-font.woff2') format('woff2');
+}

@@ -47,6 +47,7 @@ ARG CHROME_DEB_VERSION=149.0.7827.53-1
 # is its build number (paired with the Chrome stable above).
 ARG PLAYWRIGHT_CHROMIUM_BUILD=1226
 ARG VE_VERSION=1.0.45
+ARG SARASA_NERD_VERSION=1.0.35-0
 
 # uv binary (used to provision the python-build-standalone interpreters and to
 # build the recovered in-house wheels). Pulled from the official image.
@@ -130,6 +131,7 @@ ARG WEBSOCAT_VERSION
 ARG GOST_VERSION
 ARG CHROME_DEB_VERSION
 ARG PLAYWRIGHT_CHROMIUM_BUILD
+ARG SARASA_NERD_VERSION
 # Target architecture (amd64 | arm64), set automatically by BuildKit. Drives the
 # per-arch release assets selected throughout this stage.
 ARG TARGETARCH
@@ -279,6 +281,27 @@ RUN RUSTARCH="$(case ${TARGETARCH} in arm64) echo aarch64;; *) echo x86_64;; esa
       "https://github.com/go-gost/gost/releases/download/v${GOST_VERSION}/gost_${GOST_VERSION}_linux_${TARGETARCH}.tar.gz" \
     && tar -xzf /tmp/gost.tar.gz -C /usr/local/bin gost \
     && chmod +x /usr/local/bin/gost && rm -f /tmp/gost.tar.gz
+
+# -----------------------------------------------------------------------------
+# 8b. Sarasa Term K Nerd Font (WOFF2) — web font for the browser-rendered
+#     terminals (xterm.js dashboard terminal + the code-server terminal). Only
+#     the four terminal weights are kept; the browser lazy-loads each on demand.
+#     Served at /static/sandbox/sarasa-term-k-nerd-font/; the @font-face lives in
+#     sarasa-term-k.css (rootfs), wired into the dashboard terminal directly and
+#     into the code-server workbench via the code_server.conf sub_filter.
+# -----------------------------------------------------------------------------
+RUN set -eux; \
+    D=/var/www/app/static/sandbox/sarasa-term-k-nerd-font; \
+    mkdir -p "$D"; \
+    curl -fsSL -o /tmp/sarasa.zip \
+      "https://github.com/jonz94/woff2-sarasa-gothic-nerd-fonts/releases/download/v${SARASA_NERD_VERSION}/sarasa-term-k-nerd-font-woff2.zip"; \
+    unzip -j -q /tmp/sarasa.zip \
+      '*sarasa-term-k-regular-nerd-font.woff2' \
+      '*sarasa-term-k-bold-nerd-font.woff2' \
+      '*sarasa-term-k-italic-nerd-font.woff2' \
+      '*sarasa-term-k-bolditalic-nerd-font.woff2' \
+      -d "$D"; \
+    rm -f /tmp/sarasa.zip
 
 # -----------------------------------------------------------------------------
 # 9. Browser at /opt/browser (binary: /opt/browser/chrome).
