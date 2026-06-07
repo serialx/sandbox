@@ -9,7 +9,7 @@ log() {
 sleep 3
 
 log "Starting Jupyter Lab..."
-exec /opt/python3.12/bin/jupyter lab \
+exec /opt/server-venv/bin/jupyter lab \
   --notebook-dir=${WORKSPACE:-/tmp} \
   --ip=127.0.0.1 \
   --port=${JUPYTER_LAB_PORT} \

@@ -11,6 +11,13 @@ here was **reverse-engineered from a live container** of
 > see `.github/workflows/push-to-ghcr.yml`). The actual Dockerfile was never
 > published — this is a faithful reproduction, not a copy.
 
+> **This fork now targets Ubuntu 26.04 LTS.** The original reconstruction matched
+> the upstream 22.04 image; this tree has since been **modernized to
+> `ubuntu:26.04`** and **no longer targets byte-parity with upstream**. See
+> *Reconstruction strategy* below for the resulting changes: a single uv-managed
+> Python 3.13 (base env + isolated server venv), `supervisor` from apt,
+> manim/opencv dropped, yt-dlp added.
+
 ## What the image is
 
 An "all-in-one" agent sandbox: a single container exposing (behind an nginx
@@ -20,8 +27,8 @@ a full VNC desktop with Chrome, an MCP hub, and several MCP servers.
 | Service | Port | Source |
 |---|---|---|
 | nginx gateway / dashboard | 8080 | apt `nginx` + recovered `/opt/gem/nginx*.conf` |
-| sandbox `python-server` — shell/file/jupyter APIs **and the MCP hub** (`/mcp`) | 8091 | **recovered** `python-server` wheel (py3.12) |
-| JupyterLab | 8888 | pip (py3.12) |
+| sandbox `python-server` — shell/file/jupyter APIs **and the MCP hub** (`/mcp`) | 8091 | **recovered** `python-server` wheel (server venv, py3.13) |
+| JupyterLab | 8888 | pip (server venv, py3.13) |
 | Node.js REPL (code execution) | 8092 | recovered `repl-servers/nodejs` (node 22) |
 | code-server (VS Code) | 8200 | code-server 4.104.0 release |
 | MCP server: browser | 8100 | npm `@agent-infra/mcp-server-browser` |
@@ -41,10 +48,11 @@ Components fall into three buckets:
 
 1. **Public upstreams** — installed from their normal sources, pinned to the
    versions observed in the live image:
-   * `ubuntu:22.04` base, ~160 apt packages (fonts, X/VNC, fcitx5 IME, media
-     libs, chrome runtime libs, build toolchain).
-   * Python **3.11.13** + **3.12.11** via `uv` (python-build-standalone — the
-     same builds the original used).
+   * `ubuntu:26.04` base, ~160 apt packages (fonts, X/VNC, fcitx5 IME, media
+     libs, chrome runtime libs, build toolchain, `supervisor`).
+   * A single **Python 3.13** via `uv` (python-build-standalone), shared by the
+     base/user env and the isolated server venv. (26.04's apt python is 3.14;
+     we leave it incidental — only there to satisfy apt deps.)
    * Node **20.20.2 / 22.22.2 / 24.15.0** via `fnm`; npm globals `bun@1.3.3`,
      `@agent-infra/mcp-server-browser@1.2.29`, `agent-browser@0.22.3`,
      `chrome-devtools-mcp@0.9.0`, `yarn`.
@@ -52,14 +60,12 @@ Components fall into three buckets:
      `gost 3.0.0-rc10` (same versions on both arches — per-arch release assets).
      Browser: `google-chrome-stable 139.0.7258.127` on amd64; Playwright
      Chromium (build 1194) on arm64.
-   * Three pip dependency sets, reproduced verbatim from the live `pip freeze`
-     (`requirements/`):
-     * `system-python3.10.txt` (150 pkgs) — user-facing tooling (manim,
-       weasyprint, opencv, yt-dlp, …) **and supervisord** (pinned git commit).
-     * `python3.11.txt` (38 pkgs) — a lightweight matplotlib/ipykernel kernel.
-     * `python3.12.txt` (240 pkgs) — the sandbox-server runtime, JupyterLab,
-       markitdown, MCP. (`python3.12.pypi.txt` is the same list with the two
-       in-house wheels removed; they are built and installed separately.)
+   * `requirements/base-3.13.txt` — the user/base env's top-level libraries
+     (numpy/pandas/matplotlib/weasyprint/ipykernel/**yt-dlp**, …) resolved
+     against Python 3.13. The server venv's deps come from the in-house wheels'
+     own metadata plus JupyterLab, resolved at build time (no frozen file).
+     `supervisor` is now an apt package (not pip); **manim** and **opencv** are
+     dropped (unused by any in-house code).
 
 2. **Recovered from the live image, rebuilt from that source** (`context/`):
    * `context/python-server/` — the `python-server` package (`app` + `vendors`,
@@ -132,9 +138,10 @@ image builds clean and boots every service:
 * `npm -g` and the Node REPL `npm install`: put node 22's bin on `PATH` for the
   `RUN` (the `/usr/local/bin/node` symlinks are wired later; `npm`'s shebang is
   `#!/usr/bin/env node`).
-* pip into the uv-managed `/opt/python3.11` & `/opt/python3.12` and the in-house
-  wheels: add `--break-system-packages` (python-build-standalone ships a PEP-668
-  `EXTERNALLY-MANAGED` marker; the apt system python does not).
+* pip into the uv-managed base `/opt/python3.13`: add `--break-system-packages`
+  (python-build-standalone ships a PEP-668 `EXTERNALLY-MANAGED` marker — and so
+  does 26.04's apt python, unlike 22.04's). The server venv (`/opt/server-venv`)
+  needs no such flag.
 
 **Runtime ENV** — recovered/validated from the live container's `env`
 (supervisord aborts on any unset `%(ENV_*)s`):
@@ -186,9 +193,10 @@ API (navigate + real-PNG screenshot) and `/mcp` (see the caveat below).
 
 ## Fidelity notes & caveats
 
-* **Not byte-identical.** This rebuilds the image from sources rather than
-  copying its layers; pinned versions match, but apt packages resolve to the
-  current jammy point-releases and pip wheels rebuild from sdists where needed.
+* **A modernized fork, not byte-identical.** This builds from sources on
+  `ubuntu:26.04` and intentionally diverges from the upstream 22.04 image
+  (single Python 3.13, `supervisor` from apt, manim/opencv removed); apt
+  resolves current 26.04 packages and pip wheels target 3.13.
 * **Not built inside the recovery sandbox** (the k8s pod has no Docker daemon).
   The novel/risky pieces were validated independently instead:
   * both in-house wheels build cleanly and contain their JS/shell data assets;
@@ -197,7 +205,7 @@ API (navigate + real-PNG screenshot) and `/mcp` (see the caveat below).
   * `ve` is identified from its Go buildinfo as `volcengine-cli`, and
     `volcengine-cli@v1.0.43` resolves on the Go module proxy (so the `ve-build`
     stage's `go install` will fetch it);
-  * `uv` resolves the exact `3.11.13` / `3.12.11` interpreters;
+  * `uv` resolves the `3.13` interpreter;
   * every pinned release URL (code-server, noVNC, websocat, gost, fnm, uv,
     chrome) returns HTTP 200.
   The image has since been built and run end-to-end (see **Build & runtime
@@ -235,11 +243,8 @@ docker/
 ├── README.md                      # this file
 ├── apt-packages.txt               # curated apt set (reference)
 ├── apt-packages.full.txt          # raw `apt-mark showmanual` (reference)
-├── requirements/                  # pip freezes recovered from the live image
-│   ├── system-python3.10.txt
-│   ├── python3.11.txt
-│   ├── python3.12.txt             # full freeze (incl. local wheels)
-│   └── python3.12.pypi.txt        # freeze minus the two in-house wheels
+├── requirements/                  # python deps
+│   └── base-3.13.txt              # user/base env top-level libs (server deps come from the wheels)
 └── context/                       # build context for COPY/build steps
     ├── rootfs/                    # files copied verbatim into the image
     │   ├── opt/{gem,application,aio,browser-ui,terminal,skills}

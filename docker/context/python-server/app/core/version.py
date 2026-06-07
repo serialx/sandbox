@@ -13,30 +13,25 @@ logger = logging.getLogger(__name__)
 
 AIO_SHIM_BIN = '/opt/gem/bin'
 TRUE_VALUES = {'1', 'true', 'yes', 'on'}
-DEFAULT_PYTHON_VERSION = '3.10'
-DEFAULT_PYTHON_KERNEL = 'python3.10'
+DEFAULT_PYTHON_VERSION = '3.13'
+DEFAULT_PYTHON_KERNEL = 'python3'
 
-# Python version → bin directory path
+# Python version → bin directory path. Only the base 3.13 interpreter is
+# managed now; it is the default python3 on PATH, so no prefix is needed.
 PYTHON_PATH_MAP: dict[str, str] = {
-    '3': '',  # system default, no prefix needed
-    '3.10': '',  # system default
-    '3.11': '/opt/python3.11/bin',
-    '3.12': '/opt/python3.12/bin',
+    '3': '',
+    '3.13': '',
 }
 VERSIONED_PYTHON_PATHS = {
     path for path in PYTHON_PATH_MAP.values() if path
 }
 
-# Python version → Jupyter kernel name
+# Python version → Jupyter kernel name (single kernel: base 3.13 as "python3")
 PYTHON_KERNEL_MAP: dict[str, str] = {
     '3': DEFAULT_PYTHON_KERNEL,
-    '3.10': 'python3.10',
-    '3.11': 'python3.11',
-    '3.12': 'python3.12',
+    '3.13': 'python3',
     'python3': 'python3',
-    'python3.10': 'python3.10',
-    'python3.11': 'python3.11',
-    'python3.12': 'python3.12',
+    'python3.13': 'python3',
 }
 
 # Node version → bin directory path
@@ -85,7 +80,7 @@ def _get_node_env() -> str | None:
 
 
 def _normalize_python(version: str) -> str:
-    """Normalize python version string: 'python3.12' → '3.12', 'python3' → '3'."""
+    """Normalize python version string: 'python3.13' → '3.13', 'python3' → '3'."""
     return version.removeprefix('python')
 
 
@@ -126,7 +121,7 @@ def canonicalize_node_version(
 def resolve_python_version() -> str:
     """Resolve Python version string for Jupyter kernel.
 
-    Returns kernel name like 'python3.10', 'python3.12', etc.
+    Returns kernel name like 'python3' (the single base 3.13 kernel).
     """
     version = _get_python_env()
     if not version:

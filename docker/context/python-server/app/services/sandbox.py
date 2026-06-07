@@ -38,9 +38,7 @@ class SandboxService:
         home_dir = f'/home/{os.environ.get("USER")}'
         workspace = os.environ.get('WORKSPACE', '/tmp')
 
-        python3_10 = resolve_cmd_info('python3.10')
-        python3_11 = resolve_cmd_info('python3.11')
-        python3_12 = resolve_cmd_info('python3.12')
+        py = resolve_cmd_info('python3')
         nodejs = resolve_cmd_info('node')
 
         detail = SandboxDetail(
@@ -57,19 +55,9 @@ class SandboxService:
             runtime=RuntimeEnv(
                 python=[
                     ToolSpec(
-                        ver=python3_10.version,
-                        bin=str(python3_10.bin),
+                        ver=py.version,
+                        bin=str(py.bin),
                         alias=['python', 'python3', 'pip', 'pip3'],
-                    ),
-                    ToolSpec(
-                        ver=python3_11.version,
-                        bin=str(python3_11.bin),
-                        alias=['python3.11', 'pip3.11'],
-                    ),
-                    ToolSpec(
-                        ver=python3_12.version,
-                        bin=str(python3_12.bin),
-                        alias=['python3.12', 'pip3.12'],
                     ),
                 ],
                 nodejs=[

@@ -138,7 +138,7 @@ class CmdInfo(BaseModel):
 
 def resolve_cmd_info(cmd: str) -> CmdInfo:
     """
-    输入命令名（如 'python3.12' / 'python3.11' / 'git'），
+    输入命令名（如 'python3' / 'python3.13' / 'git'），
     返回 {'bin': Path|None, 'version': str|None}
     - bin 为 realpath（若能解析）
     - version 优先用 '<cmd> --version' 的首行，失败则 None

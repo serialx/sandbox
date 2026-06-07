@@ -1,0 +1,61 @@
+# User-plane Python libraries for the uv 3.13 BASE interpreter.
+#
+# This is the environment the agent's default `python3` + Jupyter kernel use.
+# Top-level only — pip resolves transitive deps fresh against Python 3.13.
+# (Unpinned on purpose for the 26.04 fork; freeze after a verified build if
+#  reproducibility is wanted.)
+#
+# Derived from the old system-python3.10 freeze, minus: manim (+its transitive
+# deps), opencv-python, supervisor (now apt), the server stack (fastapi/uvicorn/
+# pydantic — those live in the server venv), and Ubuntu-system python packages
+# (python-apt, dbus-python, PyGObject, launchpadlib, lazr.*, keyring, ...).
+
+# --- Jupyter kernel (the default code-exec kernel runs in this env) ---
+ipykernel
+
+# --- data science / numerics / viz ---
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+plotly
+pyecharts
+networkx
+kaleido
+
+# --- documents / office / PDF ---
+weasyprint
+pillow
+pymupdf
+pypdf
+python-docx
+python-pptx
+docx2txt
+openpyxl
+xlrd
+xlsxwriter
+tabulate
+prettytable
+
+# --- media / OCR ---
+av
+pydub
+pytesseract
+qrcode
+
+# --- web / scraping / data ---
+requests
+httpx
+beautifulsoup4
+lxml
+yfinance
+geopy
+biopython
+
+# --- audio/video downloader (advertised by GET /v1/sandbox) ---
+yt-dlp
+
+# --- CLI niceties commonly used in agent code ---
+rich
+tqdm

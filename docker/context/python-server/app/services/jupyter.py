@@ -39,21 +39,17 @@ def _is_true_env(name: str, default: bool = False) -> bool:
 # Kernel name mapping: user-friendly name -> actual kernel name
 # Note: JavaScript/TypeScript execution is handled by NodeJSService REPL, not Jupyter
 KERNEL_ALIASES: Dict[str, str] = {
-    # Python kernels
+    # Single Python kernel — base 3.13, registered as "python3"
     'python': 'python3',
     'python3': 'python3',
-    'python3.10': 'python3.10',
-    'python3.11': 'python3.11',
-    'python3.12': 'python3.12',
+    'python3.13': 'python3',
 }
 
-# Fallback chains for each kernel type (matching original behavior)
+# Fallback chains for each kernel type
 KERNEL_FALLBACKS: Dict[str, List[str]] = {
-    'python3': ['python3', 'python', 'python3.11', 'python3.10', 'python3.12'],
-    'python': ['python', 'python3', 'python3.11', 'python3.10', 'python3.12'],
-    'python3.10': ['python3.10', 'python3', 'python'],
-    'python3.11': ['python3.11', 'python3', 'python'],
-    'python3.12': ['python3.12', 'python3', 'python'],
+    'python3': ['python3', 'python'],
+    'python': ['python', 'python3'],
+    'python3.13': ['python3', 'python'],
 }
 
 
@@ -101,7 +97,7 @@ class JupyterService:
         staged_code_dir = os.environ.get('JUPYTER_STAGED_CODE_DIR', '').strip()
         self._staged_code_dir = staged_code_dir or '/tmp/aio-jupyter-code'
 
-        # Default kernel to pre-warm (PYTHON_VERSION > PYTHON_CODE_EXEC_VERSION > python3.10)
+        # Default kernel to pre-warm (PYTHON_VERSION > PYTHON_CODE_EXEC_VERSION > python3)
         from app.core.version import resolve_python_version
 
         self._default_kernel = resolve_python_version()
@@ -155,7 +151,7 @@ class JupyterService:
         """Ensure user site-packages is in kernel's sys.path.
 
         Problem: Jupyter kernel's sys.path may not include the user site-packages
-        directory (e.g. /home/user/.local/lib/python3.12/site-packages), but pip
+        directory (e.g. /home/user/.local/lib/python3.13/site-packages), but pip
         falls back to user install when system site-packages is not writable.
         This causes "pip install foo" to succeed but "import foo" to fail.
 
@@ -464,7 +460,7 @@ class JupyterService:
             timeout: Execution timeout in seconds
             kernel_name: Kernel name or alias. Defaults to the unified runtime Python
                 version resolved from PYTHON_VERSION.
-                Supports: 'python', 'python3', 'python3.10', 'python3.11', 'python3.12'
+                Supports: 'python', 'python3', 'python3.13'
             session_id: Optional session ID to maintain state across requests
             **kernel_kwargs: Additional kernel configuration parameters (e.g., cwd)
 

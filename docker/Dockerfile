@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1.7
 # =============================================================================
-# AIO Sandbox (all-in-one-sandbox) — reconstructed Dockerfile
+# AIO Sandbox (all-in-one-sandbox) — modernized fork (Ubuntu 26.04)
 # =============================================================================
-# Reverse-engineered from a running `ghcr.io/agent-infra/sandbox:latest`
-# container (which is a mirror of
-# enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox).
-# The upstream build recipe is not public, so this file reproduces the image
-# from first principles:
+# Originally reverse-engineered from a running `ghcr.io/agent-infra/sandbox:latest`
+# container (a mirror of
+# enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox);
+# the upstream build recipe was never public. This tree has since been FORKED and
+# modernized to `ubuntu:26.04` and NO LONGER targets byte-parity with upstream
+# (single uv Python 3.13 + isolated server venv, apt supervisor, manim/opencv
+# dropped, yt-dlp added). It builds the image from first principles:
 #
 #   * Public components  -> installed from upstream (apt / pip / npm / releases)
 #   * In-house components -> rebuilt from source recovered out of the image
@@ -23,8 +25,7 @@
 # -----------------------------------------------------------------------------
 
 # ----- pinned versions (observed in the live image) --------------------------
-ARG PY311_VERSION=3.11.13
-ARG PY312_VERSION=3.12.11
+ARG PY313_VERSION=3.13
 ARG NODE20_VERSION=20.20.2
 ARG NODE22_VERSION=22.22.2
 ARG NODE24_VERSION=24.15.0
@@ -110,10 +111,9 @@ RUN go install -trimpath -ldflags "-s -w -X main.version=${VE_VERSION}" \
 # =============================================================================
 # Final image
 # =============================================================================
-FROM ubuntu:22.04
+FROM ubuntu:26.04
 
-ARG PY311_VERSION
-ARG PY312_VERSION
+ARG PY313_VERSION
 ARG NODE20_VERSION
 ARG NODE22_VERSION
 ARG NODE24_VERSION
@@ -138,7 +138,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # -----------------------------------------------------------------------------
 # 1. System packages
 #    Curated from `apt-mark showmanual` on the live image (minus base/priority
-#    packages that ship with ubuntu:22.04). Grouped by purpose.
+#    packages that ship with ubuntu:26.04). Grouped by purpose.
 # -----------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
       # --- toolchain / build deps (native python & node module builds) ---
@@ -149,23 +149,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       rsync openssh-client sudo software-properties-common gnupg vim nano less \
       net-tools netcat-openbsd iputils-ping telnet nmap tmux tilix lsyncd \
       ripgrep \
-      # --- python (system 3.10) ---
-      python3 python3-pip python3-tk \
-      # --- web gateway ---
-      nginx \
+      # --- python (apt 3.14 — incidental; our stack runs on uv-managed 3.13) ---
+      python3 \
+      # --- web gateway + process manager ---
+      nginx supervisor \
       # --- virtual desktop: X / VNC / window manager / clipboard ---
       tigervnc-standalone-server openbox autocutsel \
       x11-utils x11-xserver-utils xauth xclip xdotool xdg-utils \
       gnome-screenshot dbus dbus-x11 \
       # --- CJK input method (fcitx5) ---
       fcitx5 fcitx5-chinese-addons fcitx5-frontend-gtk3 fcitx5-frontend-qt5 \
-      # --- media / document processing (manim, weasyprint, opencv, ...) ---
+      # --- media / document processing (ffmpeg, imagemagick) ---
       ffmpeg imagemagick \
       # --- chrome / GUI runtime libraries ---
-      libnss3 libnspr4 libgbm1 libdrm2 libgtk-3-0 libasound2 libcups2 \
-      libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libxcomposite1 libxdamage1 \
+      libnss3 libnspr4 libgbm1 libdrm2 libgtk-3-0t64 libasound2t64 libcups2t64 \
+      libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 libxcomposite1 libxdamage1 \
       libxfixes3 libxrandr2 libxkbcommon0 libwayland-client0 libvulkan1 \
-      libxext6 libxv1 libgcrypt20 libglib2.0-0 libgl1 libcairo2 libpango-1.0-0 \
+      libxext6 libxv1 libgcrypt20 libglib2.0-0t64 libgl1 libcairo2 libpango-1.0-0 \
       # --- fonts (Latin / CJK / Indic / emoji / ...) ---
       fontconfig fonts-dejavu fonts-liberation fonts-noto-core fonts-noto-extra \
       fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji \
@@ -189,10 +189,15 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 # 3. Non-root user `gem` (uid/gid 1000) + passwordless sudo
 # -----------------------------------------------------------------------------
 ENV USER=gem
-RUN groupadd -g 1000 gem \
-    && useradd -m -u 1000 -g 1000 -s /bin/bash gem \
-    && echo 'gem ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/gem \
-    && chmod 0440 /etc/sudoers.d/gem
+# Ubuntu 24.04+ base images ship a default user/group at uid/gid 1000; remove
+# whatever occupies 1000 so `gem` can take it (the uid the whole runtime expects).
+RUN set -eux; \
+    if getent passwd 1000 >/dev/null; then userdel -r "$(getent passwd 1000 | cut -d: -f1)" 2>/dev/null || true; fi; \
+    if getent group 1000 >/dev/null; then groupdel "$(getent group 1000 | cut -d: -f1)" 2>/dev/null || true; fi; \
+    groupadd -g 1000 gem; \
+    useradd -m -u 1000 -g 1000 -s /bin/bash gem; \
+    echo 'gem ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/gem; \
+    chmod 0440 /etc/sudoers.d/gem
 
 # -----------------------------------------------------------------------------
 # 4. uv (provisioner + wheel builder)
@@ -200,16 +205,15 @@ RUN groupadd -g 1000 gem \
 COPY --from=uvbin /uv /uvx /usr/local/bin/
 
 # -----------------------------------------------------------------------------
-# 5. Python 3.11 + 3.12 (python-build-standalone, provisioned via uv)
-#    The live image's interpreters were built by python-build-standalone (the
-#    CONFIG_ARGS signature `--with-openssl=/tools/deps ... --enable-bolt CC=clang`
-#    is unmistakable); uv installs the very same builds.
+# 5. Python 3.13 (python-build-standalone, provisioned via uv) — the single
+#    interpreter we manage. The user/base env and the isolated server venv both
+#    derive from it; the apt python (3.14) is left untouched (incidental, only
+#    present to satisfy apt deps).
 # -----------------------------------------------------------------------------
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
-RUN uv python install ${PY311_VERSION} ${PY312_VERSION} \
+RUN uv python install ${PY313_VERSION} \
     && UVARCH="$(case ${TARGETARCH} in arm64) echo aarch64;; *) echo x86_64;; esac)" \
-    && ln -sfn /opt/uv-python/cpython-${PY311_VERSION}-linux-${UVARCH}-gnu /opt/python3.11 \
-    && ln -sfn /opt/uv-python/cpython-${PY312_VERSION}-linux-${UVARCH}-gnu /opt/python3.12
+    && ln -sfn "$(ls -d /opt/uv-python/cpython-${PY313_VERSION}.*-linux-${UVARCH}-gnu | sort -V | tail -1)" /opt/python3.13
 
 # -----------------------------------------------------------------------------
 # 6. Node.js 20 / 22 / 24 via fnm (FNM_DIR=/opt/fnm), node 22 is primary
@@ -308,32 +312,36 @@ RUN set -eux; \
     ln -sf /usr/local/bin/browser /usr/local/bin/chromium-browser-stable
 
 # -----------------------------------------------------------------------------
-# 10. Python dependency sets (reproduced from the live `pip freeze`s)
-#     - system python 3.10 : user-facing tooling + supervisord (manim,
-#                            weasyprint, opencv, yt-dlp, supervisor@git, ...)
-#     - /opt/python3.11    : lightweight matplotlib/ipykernel data kernel
-#     - /opt/python3.12    : sandbox server runtime + JupyterLab + markitdown
+# 10. User-plane Python libraries (the agent's default python3 + Jupyter kernel)
+#     into the BASE 3.13 interpreter. python-build-standalone ships a PEP-668
+#     EXTERNALLY-MANAGED marker, hence --break-system-packages. The default
+#     Jupyter kernel ("python3") is registered here, pointing at this base env,
+#     so agent code runs isolated from the server venv (§11).
 # -----------------------------------------------------------------------------
 COPY requirements/ /tmp/requirements/
-RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && python3 -m pip install --no-cache-dir -r /tmp/requirements/system-python3.10.txt \
-    && ln -sf /usr/local/bin/supervisord /usr/bin/supervisord
-# (uv's python-build-standalone interpreters ship a PEP-668 EXTERNALLY-MANAGED
-#  marker, so pip refuses to install without --break-system-packages. The apt
-#  system python3.10 above has no such marker.)
-RUN /opt/python3.11/bin/python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements/python3.11.txt
-RUN /opt/python3.12/bin/python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements/python3.12.pypi.txt
+RUN /opt/python3.13/bin/python -m pip install --no-cache-dir --break-system-packages \
+      --upgrade pip setuptools wheel \
+    && /opt/python3.13/bin/python -m pip install --no-cache-dir --break-system-packages \
+      -r /tmp/requirements/base-3.13.txt \
+    && /opt/python3.13/bin/python -m ipykernel install \
+      --name python3 --display-name "Python 3 (sandbox)" --prefix /usr/local \
+    && rm -rf /tmp/requirements
 
 # -----------------------------------------------------------------------------
-# 11. In-house Python packages — rebuilt from recovered source into wheels and
-#     installed into /opt/python3.12 (matches the original /tmp/wheels install).
+# 11. In-house Python packages (browser-sdk, python-server) — built from
+#     recovered source into wheels and installed, WITH their declared deps
+#     resolved against 3.13, into an isolated SERVER venv alongside JupyterLab.
+#     Keeping the server off the base interpreter means agent `pip install`s in
+#     the default kernel/shell cannot break the running API server.
 # -----------------------------------------------------------------------------
 COPY context/browser-sdk   /usr/src/browser-sdk
 COPY context/python-server /usr/src/python-server
 RUN uv build --wheel --out-dir /tmp/wheels /usr/src/browser-sdk \
     && uv build --wheel --out-dir /tmp/wheels /usr/src/python-server \
-    && /opt/python3.12/bin/python -m pip install --no-cache-dir --break-system-packages --no-deps \
-         /tmp/wheels/browser_sdk-*.whl /tmp/wheels/python_server-*.whl \
+    && /opt/python3.13/bin/python -m venv /opt/server-venv \
+    && /opt/server-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/server-venv/bin/pip install --no-cache-dir \
+         /tmp/wheels/browser_sdk-*.whl /tmp/wheels/python_server-*.whl jupyterlab \
     && rm -rf /tmp/wheels /usr/src/browser-sdk /usr/src/python-server
 
 # -----------------------------------------------------------------------------
@@ -374,12 +382,15 @@ RUN set -eux; \
              mcp-server-browser chrome-devtools-mcp agent-browser-real; do \
       ln -sf /opt/nodejs/22/bin/$b /usr/local/bin/$b; \
     done; \
-    # python interpreters + entrypoints \
-    ln -sf /opt/python3.11/bin/python    /usr/local/bin/python3.11; \
-    ln -sf /opt/python3.12/bin/python    /usr/local/bin/python3.12; \
-    ln -sf /opt/python3.11/bin/pip3      /usr/local/bin/pip3.11; \
-    ln -sf /opt/python3.12/bin/pip3      /usr/local/bin/pip3.12; \
-    ln -sf /opt/python3.12/bin/python-server /usr/local/bin/python-server; \
+    # python interpreter + entrypoints (base 3.13 is the default python/python3) \
+    ln -sf /opt/python3.13/bin/python    /usr/local/bin/python; \
+    ln -sf /opt/python3.13/bin/python    /usr/local/bin/python3; \
+    ln -sf /opt/python3.13/bin/python    /usr/local/bin/python3.13; \
+    ln -sf /opt/python3.13/bin/pip3      /usr/local/bin/pip3; \
+    ln -sf /opt/python3.13/bin/pip3      /usr/local/bin/pip3.13; \
+    # expose base-env console scripts that the sandbox advertises (GET /v1/sandbox) \
+    ln -sf /opt/python3.13/bin/yt-dlp    /usr/local/bin/yt-dlp; \
+    ln -sf /opt/server-venv/bin/python-server /usr/local/bin/python-server; \
     # in-house CLIs (copied via rootfs) + wrapper wiring \
     ln -sf /opt/gem/agent-browser-wrapper.sh /usr/local/bin/agent-browser; \
     ln -sf /opt/gem/xdg-settings             /usr/local/bin/xdg-settings; \
@@ -390,7 +401,7 @@ RUN set -eux; \
     ln -sf /opt/gem/supervisord.conf /etc/supervisord.conf; \
     # wire the recovered font-name aliases into fontconfig so named CJK/Office \
     # fonts (SimHei, Microsoft YaHei, PingFang, MS Gothic, ...) map to the \
-    # installed Noto CJK faces for chrome / pango / weasyprint / manim. Ubuntu \
+    # installed Noto CJK faces for chrome / pango / weasyprint. Ubuntu \
     # only ships the Latin metric-aliases (Arial -> Liberation) by default. \
     mkdir -p /etc/fonts/conf.d; \
     ln -sf /opt/gem/99-font-aliases.conf /etc/fonts/conf.d/99-font-aliases.conf; \

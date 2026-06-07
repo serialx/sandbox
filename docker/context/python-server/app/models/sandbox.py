@@ -29,7 +29,7 @@ class ToolSpec(BaseModel):
 
 
 class RuntimeEnv(BaseModel):
-    """version, path, etc. (python3, python3.11, python3.12, pip3, pip, uv, jupyter)"""
+    """version, path, etc. (python3, python3.13, pip3, pip, uv, jupyter)"""
 
     python: List[ToolSpec]
     nodejs: List[ToolSpec]

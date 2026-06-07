@@ -247,7 +247,7 @@ async def code_info():
         ),
     }
 
-    # resolve_python_version() returns an explicit kernel like "python3.10".
+    # resolve_python_version() returns an explicit kernel like "python3".
     kernel_name = resolve_python_version()
     python_version = kernel_name.removeprefix('python')
 
