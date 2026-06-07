@@ -1,1 +1,20 @@
 export TERM=xterm-256color
+
+# Color support for ls/grep and the usual listing aliases. This file is copied
+# over ~/.bashrc at startup by run.sh, replacing the stock skel .bashrc, so the
+# color setup has to live here to reach interactive shells (both the dashboard
+# /terminal and the code-server integrated terminal source ~/.bashrc).
+if command -v dircolors >/dev/null 2>&1; then
+    eval "$(dircolors -b)"
+    alias ls='ls --color=auto'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+# Colored prompt: bold-green user@host, bold-blue cwd. Kept in sync with the
+# prompt the python-server injects for the dashboard terminal (shell_ws.py).
+PS1='\[\e[01;32m\]\u@\h\[\e[00m\]:\[\e[01;34m\]\w\[\e[00m\]\$ '

@@ -242,11 +242,12 @@ class TerminalWsManager:
 
         session_env = self._build_session_env(environment)
 
-        # 创建简洁的 PS1 提示符
+        # 创建简洁的 PS1 提示符 (colored: bold-green user@host, bold-blue cwd —
+        # kept in sync with /opt/gem/bashrc so both terminals match)
         if 'bash' in shell:
-            unique_ps1 = '\\u@\\h:\\w$ '
+            unique_ps1 = r'\[\e[01;32m\]\u@\h\[\e[00m\]:\[\e[01;34m\]\w\[\e[00m\]\$ '
         elif 'zsh' in shell:
-            unique_ps1 = '%n@%m:%~% '
+            unique_ps1 = '%F{green}%n@%m%f:%F{blue}%~%f%# '
         else:
             unique_ps1 = '$ '
 
