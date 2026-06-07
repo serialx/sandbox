@@ -7,9 +7,10 @@ here was **reverse-engineered from a live container** of
 
 > The public `ghcr.io/agent-infra/sandbox` image is only a multi-arch *mirror*
 > of an upstream prebuilt image
-> (`enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox`,
-> see `.github/workflows/push-to-ghcr.yml`). The actual Dockerfile was never
-> published — this is a faithful reproduction, not a copy.
+> (`enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox`).
+> The actual Dockerfile was never published — this is a faithful reproduction,
+> not a copy. This fork builds and publishes its **own** multi-arch image from
+> this Dockerfile on `v*` tags (see `.github/workflows/docker-release.yml`).
 
 > **This fork now targets Ubuntu 26.04 LTS.** The original reconstruction matched
 > the upstream 22.04 image; this tree has since been **modernized to
