@@ -171,6 +171,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       # --- fonts (Latin / CJK / Indic / emoji / ...) ---
       fontconfig fonts-dejavu fonts-liberation fonts-noto-core fonts-noto-extra \
       fonts-noto-cjk fonts-noto-cjk-extra fonts-noto-color-emoji \
+      fonts-pretendard \
       fonts-arphic-ukai fonts-arphic-uming fonts-unfonts-core \
       fonts-ipafont-gothic fonts-ipafont-mincho fonts-takao-mincho \
       fonts-indic fonts-khmeros fonts-lao fonts-thai-tlwg fonts-sil-padauk \
@@ -407,6 +408,8 @@ RUN set -eux; \
     # only ships the Latin metric-aliases (Arial -> Liberation) by default. \
     mkdir -p /etc/fonts/conf.d; \
     ln -sf /opt/gem/99-font-aliases.conf /etc/fonts/conf.d/99-font-aliases.conf; \
+    # Korean sans-serif default -> Pretendard (52- must precede 60-generic.conf) \
+    ln -sf /opt/gem/52-pretendard-korean.conf /etc/fonts/conf.d/52-pretendard-korean.conf; \
     # node/fnm env for shells; run.sh sources this file under `set -e` \
     mkdir -p /etc/profile.d; \
     ln -sf /opt/gem/nodejs.sh /etc/profile.d/nodejs.sh; \
