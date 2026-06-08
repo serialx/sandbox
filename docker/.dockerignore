@@ -1,5 +1,4 @@
 # Reference-only files (not needed inside the build)
-apt-packages.full.txt
 README.md
 
 # Junk that should never enter the build context

@@ -242,8 +242,6 @@ docker/
 ├── Dockerfile                     # reconstructed build (stages: uvbin, aio-build, ve-build, final)
 ├── .dockerignore
 ├── README.md                      # this file
-├── apt-packages.txt               # curated apt set (reference)
-├── apt-packages.full.txt          # raw `apt-mark showmanual` (reference)
 ├── requirements/                  # python deps
 │   └── base-3.13.txt              # user/base env top-level libs (server deps come from the wheels)
 └── context/                       # build context for COPY/build steps
